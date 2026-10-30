@@ -5,10 +5,8 @@
 #include <vector>
 #include <string>
 
-// TODO: ASAN
-
 TEST_CASE("subscriber receives published message") {
-  pubsub::Broker broker;
+  pubsub::Broker<std::string> broker;
   std::vector<std::string> received;
 
   broker.subscribe("prices", [&received](const std::string& msg) {
@@ -23,7 +21,7 @@ TEST_CASE("subscriber receives published message") {
 TEST_CASE("multiple subscribers receives published message") {
   constexpr size_t SUBSCRIBERS = 15;
 
-  pubsub::Broker broker;
+  pubsub::Broker<std::string> broker;
   std::array<std::string, SUBSCRIBERS> received;
   size_t n_received = 0;
 
@@ -44,7 +42,7 @@ TEST_CASE("multiple subscribers receives published message") {
 }
 
 TEST_CASE("publishing to an unknown topic does nothing") {
-  pubsub::Broker broker;
+  pubsub::Broker<std::string> broker;
   std::vector<std::string> received;
 
   broker.subscribe("prices", [&received](const std::string& msg) {
@@ -57,13 +55,13 @@ TEST_CASE("publishing to an unknown topic does nothing") {
 }
 
 TEST_CASE("publishing to an unknown topic does nothing with no subscribers at all") {
-  pubsub::Broker broker;
+  pubsub::Broker<std::string> broker;
 
   REQUIRE_NOTHROW(broker.publish("TRADES", "MSFT 100.5"));
 }
 
 TEST_CASE("messages do not go to other topic's subscribers") {
-  pubsub::Broker broker;
+  pubsub::Broker<std::string> broker;
   std::vector<std::string> received_prices, received_fulfillment;
 
   broker.subscribe("prices", [&received_prices](const std::string& msg) {
@@ -84,7 +82,7 @@ TEST_CASE("messages do not go to other topic's subscribers") {
 TEST_CASE("messages are delivered in publish order") {
   constexpr size_t MESSAGES = 5;
 
-  pubsub::Broker broker;
+  pubsub::Broker<std::string> broker;
   std::vector<std::string> received;
   std::vector<std::string> expected;
 
@@ -102,7 +100,7 @@ TEST_CASE("messages are delivered in publish order") {
 }
 
 TEST_CASE("callback subscribed twice calls twice") {
-  pubsub::Broker broker;
+  pubsub::Broker<std::string> broker;
 
   std::vector<std::string> received;
 
@@ -116,4 +114,19 @@ TEST_CASE("callback subscribed twice calls twice") {
   broker.publish("prices", "AAPL 15.4");
 
   REQUIRE(received == std::vector<std::string>(2, "AAPL 15.4"));
+}
+
+TEST_CASE("non-string broker template type") {
+  pubsub::Broker<int> broker;
+
+  std::vector<int> received;
+
+  broker.subscribe("timestamp", [&received](const int& msg) {
+    received.push_back(msg);
+  });
+
+  broker.publish("timestamp", 12345678);
+  broker.publish("timestamp", 87654321);
+
+  REQUIRE(received == std::vector<int>{12345678, 87654321});
 }

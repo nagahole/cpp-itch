@@ -1,22 +1,24 @@
 #pragma once
 
 #include <functional>
-#include <utility>
 #include <string>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 
 namespace pubsub {
 
-using Callback = std::function<void(const std::string& msg)>;
-
+template<typename T>
 class Broker {
+
 public:
+  using Callback = std::function<void(const T&)>;
+
   void subscribe(const std::string& topic, Callback callback) {
     subscribers_[topic].push_back(std::move(callback));
   }
 
-  void publish(const std::string& topic, const std::string& msg) {
+  void publish(const std::string& topic, const T& msg) {
     auto it = subscribers_.find(topic);
 
     if (it != subscribers_.end()) {

@@ -2,7 +2,7 @@
 #include <iostream>
 
 int main() {
-  pubsub::Broker broker;
+  pubsub::Broker<std::string> broker;
 
   int print_no = 0;
 
