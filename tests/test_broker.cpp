@@ -1,15 +1,18 @@
-#include <catch2/catch_test_macros.hpp>
-#include <pubsub/broker.hpp>
-
 #include <array>
 #include <vector>
 #include <string>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <pubsub/broker.hpp>
+#include <pubsub/subscription.hpp>
+
 
 TEST_CASE("subscriber receives published message") {
   pubsub::Broker<std::string> broker;
   std::vector<std::string> received;
 
-  broker.subscribe("prices", [&received](const std::string& msg) {
+  pubsub::Subscription sub = broker.subscribe("prices", [&received](const std::string& msg) {
     received.push_back(msg);
   });
 
@@ -22,14 +25,16 @@ TEST_CASE("multiple subscribers receives published message") {
   constexpr size_t SUBSCRIBERS = 15;
 
   pubsub::Broker<std::string> broker;
+  std::vector<pubsub::Subscription> subs;
+
   std::array<std::string, SUBSCRIBERS> received;
   size_t n_received = 0;
 
   for (size_t i = 0; i < SUBSCRIBERS; i++) {
-    broker.subscribe("prices", [&received, &n_received, i](const std::string& msg) {
+    subs.push_back(broker.subscribe("prices", [&received, &n_received, i](const std::string& msg) {
       received[i] = msg;
       n_received++;
-    });
+    }));
   }
 
   broker.publish("prices", "AAPL 55.6");
@@ -45,7 +50,7 @@ TEST_CASE("publishing to an unknown topic does nothing") {
   pubsub::Broker<std::string> broker;
   std::vector<std::string> received;
 
-  broker.subscribe("prices", [&received](const std::string& msg) {
+  pubsub::Subscription sub = broker.subscribe("prices", [&received](const std::string& msg) {
     received.push_back(msg);
   });
 
@@ -64,11 +69,11 @@ TEST_CASE("messages do not go to other topic's subscribers") {
   pubsub::Broker<std::string> broker;
   std::vector<std::string> received_prices, received_fulfillment;
 
-  broker.subscribe("prices", [&received_prices](const std::string& msg) {
+  pubsub::Subscription price_sub = broker.subscribe("prices", [&received_prices](const std::string& msg) {
     received_prices.push_back(msg);
   });
 
-  broker.subscribe("fulfillment", [&received_fulfillment](const std::string& msg) {
+  pubsub::Subscription fulfillment_sub = broker.subscribe("fulfillment", [&received_fulfillment](const std::string& msg) {
     received_fulfillment.push_back(msg);
   });
 
@@ -86,7 +91,7 @@ TEST_CASE("messages are delivered in publish order") {
   std::vector<std::string> received;
   std::vector<std::string> expected;
 
-  broker.subscribe("prices", [&received](const std::string& msg) {
+  pubsub::Subscription sub = broker.subscribe("prices", [&received](const std::string& msg) {
     received.push_back(msg);
   });
 
@@ -108,8 +113,8 @@ TEST_CASE("callback subscribed twice calls twice") {
     received.push_back(msg);
   };
 
-  broker.subscribe("prices", callback);
-  broker.subscribe("prices", callback);
+  pubsub::Subscription sub_1 = broker.subscribe("prices", callback);
+  pubsub::Subscription sub_2 = broker.subscribe("prices", callback);
 
   broker.publish("prices", "AAPL 15.4");
 
@@ -121,7 +126,7 @@ TEST_CASE("non-string broker template type") {
 
   std::vector<int> received;
 
-  broker.subscribe("timestamp", [&received](const int& msg) {
+  pubsub::Subscription sub = broker.subscribe("timestamp", [&received](const int& msg) {
     received.push_back(msg);
   });
 
@@ -130,3 +135,33 @@ TEST_CASE("non-string broker template type") {
 
   REQUIRE(received == std::vector<int>{12345678, 87654321});
 }
+
+TEST_CASE("subscription unsubscribes on destruction") {
+  pubsub::Broker<std::string> broker;
+
+  std::vector<std::string> received;
+
+  {
+    pubsub::Subscription sub = broker.subscribe("prices", [&received](const std::string& msg) {
+      received.push_back(msg);
+    });
+  }
+
+  broker.publish("prices", "APPL 0.05");
+
+  REQUIRE(received == std::vector<std::string>{});
+}
+
+TEST_CASE("subscription outlives broker") {
+
+  {
+    pubsub::Subscription sub([](){});
+
+    {
+      pubsub::Broker<std::string> broker;
+      sub = broker.subscribe("prices", [](const std::string&){});
+    }
+  }
+  // no crash when `sub.cleanup_()` runs after broker is gone
+}
+

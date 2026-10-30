@@ -4,7 +4,8 @@
 #include <string>
 #include <utility>
 #include <unordered_map>
-#include <vector>
+
+#include "subscription.hpp"
 
 namespace pubsub {
 
@@ -14,22 +15,39 @@ class Broker {
 public:
   using Callback = std::function<void(const T&)>;
 
-  void subscribe(const std::string& topic, Callback callback) {
-    subscribers_[topic].push_back(std::move(callback));
-  }
+  Subscription subscribe(const std::string& topic, Callback cb) {
+    int id = instances_++;
+
+    subscribers_[topic].emplace(id, std::move(cb));
+
+    std::weak_ptr<bool> weak = alive_;
+    return Subscription([this, topic, id, weak]() {
+      
+      if (weak.lock()) {
+        auto it = subscribers_.find(topic);
+
+        if (it != subscribers_.end()) {
+          it->second.erase(id);
+        }
+      }
+    });
+}
 
   void publish(const std::string& topic, const T& msg) {
     auto it = subscribers_.find(topic);
 
     if (it != subscribers_.end()) {
-      for (const auto& cb : it->second) {
+      for (auto& [_, cb] : it->second) {
         cb(msg);
       }
     }
   }
 
 private:
-  std::unordered_map<std::string, std::vector<Callback>> subscribers_;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
+  std::unordered_map<std::string, std::unordered_map<int, Callback>> subscribers_;
+
+  int instances_ = 0;
 };
 
 } // namespace pubsub
