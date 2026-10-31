@@ -1,2 +1,3 @@
-# cpp_pubsub
-In-process pub/sub library
+# cpp-itch
+
+ITCH 5.0 feed handler
