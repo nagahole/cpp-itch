@@ -11,8 +11,8 @@ public:
   Subscription(const Subscription&) = delete;
   Subscription& operator=(const Subscription&) = delete;
 
-  Subscription(Subscription&& other) : cleanup_(std::move(other.cleanup_)) {}
-  Subscription& operator=(Subscription&& other) {
+  Subscription(Subscription&& other) noexcept : cleanup_(std::move(other.cleanup_)) {}
+  Subscription& operator=(Subscription&& other) noexcept {
     if (this != &other) {
       if (cleanup_) {
         cleanup_(); // clean up current resource
@@ -21,7 +21,7 @@ public:
     }
     return *this;
   }
-  
+
   Subscription(std::function<void()> cleanup) : cleanup_(std::move(cleanup)) { }
 
   ~Subscription() {
