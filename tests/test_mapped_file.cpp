@@ -37,7 +37,7 @@ public:
 
   ~TempFile() {
     std::error_code ec;
-    std::filesystem::remove(path_, ec); // no-op if empty
+    std::filesystem::remove(path_, ec);
   }
 };
 
