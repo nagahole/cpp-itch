@@ -10,6 +10,7 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(tests
   test_broker.cpp
   test_endian.cpp
+  test_mapped_file.cpp
 )
 target_link_libraries(tests PRIVATE pubsub itch Catch2::Catch2WithMain)
 target_compile_options(tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
