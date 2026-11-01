@@ -23,10 +23,9 @@ Personal context (goals, schedule) lives in a local file that isn't committed:
 
 Each stage should end with something that compiles, passes tests (including under sanitizers), and is worth showing. If time runs short, stopping after any stage is fine. Stage 3 is the minimum that counts as a finished project.
 
-### Stage 1: basic broker (finishing, then frozen)
-- Done: topics by name, callbacks, synchronous delivery, tests
-- Remaining: the small cleanups in "Current status" below, then commit
-- **Dropped:** templated message type and the `Subscription` RAII handle. I'll practise templates and RAII in the feed handler instead.
+### Stage 1: basic broker (done, frozen)
+- Topics by name, callbacks, synchronous delivery, templated message type, `Subscription` RAII handle, tests
+- Frozen: no further features. Only tag it (see "Current status").
 
 ### Stage 2: ITCH 5.0 parser
 - Get one day's sample file from Nasdaq (emi.nasdaq.com/ITCH, a few GB gzipped) and the ITCH 5.0 spec PDF. Keep data in `data/`, which is gitignored.
@@ -73,19 +72,21 @@ A short README covering what the system does, how it's built, how I checked corr
 ## Current status
 
 **Done (stage 1):**
-- CMake setup: header-only `pubsub` INTERFACE library, `examples/basic.cpp`, tests via Catch2 v3 (FetchContent)
-- `include/pubsub/broker.hpp`: non-templated `Broker` with `subscribe` / `publish` over `std::string` messages; callbacks stored as `std::vector<std::function<void(const std::string&)>>` per topic
-- `tests/test_broker.cpp` covers: single delivery, multiple subscribers, unknown topic, publish with no subscribers, topic isolation, message order for one subscriber, same callback subscribed twice is called twice
+- Build: header-only `pubsub` INTERFACE library, `examples/basic.cpp`, tests via Catch2 v3 (FetchContent)
+- `PUBSUB_SANITIZER` CMake cache variable (applied globally before targets)
+- `CMakePresets.json` (Ninja): `debug` → `build/`, `release` → `build-release/` (`-O2 -DNDEBUG`), `asan` → `build-asan/` (`address,undefined`), `tsan` → `build-tsan/`. Each has configure, build, test and workflow presets.
+- `include/pubsub/broker.hpp`: `Broker<T>` with `subscribe` / `publish`. Callbacks stored per topic as `std::unordered_map<int, std::function<void(const T&)>>`, keyed by a per-broker subscriber ID. `subscribe` returns a `Subscription`.
+- `include/pubsub/subscription.hpp`: move-only RAII handle holding a `std::function<void()>` cleanup that unsubscribes in the destructor. Move ops leave the source empty; move assignment runs the current cleanup first.
+- Broker lifetime guard: `Broker` owns a `shared_ptr<bool>` sentinel and each cleanup lambda holds a `weak_ptr` to it, so destroying a `Subscription` after its broker is a no-op
+- `tests/test_broker.cpp` covers: single delivery, multiple subscribers (handles stored in a `std::vector`), unknown topic, publish with no subscribers, topic isolation, message order for one subscriber, same callback subscribed twice is called twice, non-string message type (`int`), unsubscribe on destruction, subscription outliving its broker
+- Tests pass under the `asan` preset
 
 **Next:**
-1. Rename `SUBSCRIBERS` to `MESSAGES` in the message-order test only (it counts messages)
-2. Add a sanitizer option to CMake (`PUBSUB_SANITIZER` cache variable, applied before targets) and run tests in a separate `build-asan/` directory with `address,undefined`. This will be reused for the rest of the project.
-3. Commit stage 1 and tag it (`stage1-broker`)
-4. Add a Release build preset for benchmarks (`-O2`, optionally `-march=native`; never benchmark Debug or sanitizer builds)
-5. Download the ITCH sample file and spec, and add `data/` to `.gitignore`
-6. Start stage 2: `mmap` wrapper, then the length-prefixed message loop counting messages by type
+1. Tag stage 1 (`git tag stage1-broker`)
+2. Add `data/` to `.gitignore`; download one day's ITCH sample file and the ITCH 5.0 spec into `data/`
+3. Start stage 2: `mmap` RAII wrapper, then the length-prefixed message loop counting messages by type
 
-**Placeholder files:** keep `include/pubsub/spsc_queue.hpp` and `tests/test_spsc_queue.cpp` (stage 5) and `benchmarks/` (stages 3–5). Delete `include/pubsub/subscription.hpp` (dropped). Suggested new layout: `include/itch/` (parser, message structs), `include/book/` (reference and optimised books), `tools/` (the full-day replay executable).
+**Placeholder files (empty):** `include/pubsub/spsc_queue.hpp` and `tests/test_spsc_queue.cpp` (stage 5), `benchmarks/bench_queues.cpp` and `benchmarks/CMakeLists.txt` (stages 3–5), `src/broker.cpp` (unused, since the broker is header-only; can be deleted). Suggested new layout: `include/itch/` (parser, message structs), `include/book/` (reference and optimised books), `tools/` (the full-day replay executable).
 
 ## Design decisions so far
 
@@ -93,7 +94,10 @@ Broker (stage 1, kept for reference):
 - Header-only, since templates need definitions in headers anyway
 - Delivery order across different subscribers is not guaranteed; message order for a single subscriber is
 - Subscribing the same callback twice means it is called twice (no deduplication)
-- Known issue, not being fixed since the broker is frozen: a callback that calls `subscribe` on the same topic during `publish` can reallocate the vector being iterated (undefined behaviour)
+- Subscriber IDs are per broker instance, not global
+- `Subscription` is move-only: exactly one handle owns each cleanup
+- A `Subscription` must not outlive its broker in a way that touches freed memory; the `weak_ptr` sentinel guards this (single-threaded only, since nothing stops the broker dying between `lock()` and the erase on another thread)
+- Known issue, not being fixed since the broker is frozen: subscribing to, or destroying a `Subscription` for, the same topic from inside a callback during `publish` modifies the map being iterated (iterator invalidation, undefined behaviour)
 
 Feed handler:
 - Prices stay as integers (ITCH prices are fixed-point `uint32` with 4 decimal places). Never convert to floating point inside the book.
@@ -119,7 +123,10 @@ Feed handler:
 ## Build and test
 
 ```
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake --workflow --preset debug     # configure + build + test
+cmake --workflow --preset asan      # same, under ASan + UBSan
+
+cmake --build --preset asan && ctest --preset asan   # day to day, after first configure
 ```
+
+Benchmarks only from `--preset release`. If a `build-*/` directory was configured with a different generator or source path, delete it and reconfigure.
