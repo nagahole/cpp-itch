@@ -19,8 +19,8 @@ TEST_CASE("known bytes 16 bits") {
 }
 
 TEST_CASE("known bytes 32 bits") {
-  const std::array<std::byte, 4> buf { 
-    std::byte(0x12), 
+  const std::array<std::byte, 4> buf {
+    std::byte(0x12),
     std::byte(0x34),
     std::byte(0x56),
     std::byte(0x78)
@@ -32,8 +32,8 @@ TEST_CASE("known bytes 32 bits") {
 }
 
 TEST_CASE("known bytes 48 bits") {
-  const std::array<std::byte, 6> buf { 
-    std::byte(0x11), 
+  const std::array<std::byte, 6> buf {
+    std::byte(0x11),
     std::byte(0x22),
     std::byte(0x33),
     std::byte(0x44),
@@ -47,8 +47,8 @@ TEST_CASE("known bytes 48 bits") {
 }
 
 TEST_CASE("known bytes 64 bits") {
-  const std::array<std::byte, 8> buf { 
-    std::byte(0x11), 
+  const std::array<std::byte, 8> buf {
+    std::byte(0x11),
     std::byte(0x22),
     std::byte(0x33),
     std::byte(0x44),
@@ -72,8 +72,8 @@ TEST_CASE("known bytes 16 bits (high-bit bytes)") {
 }
 
 TEST_CASE("known bytes 32 bits (high-bit bytes)") {
-  const std::array<std::byte, 4> buf { 
-    std::byte(0xFF), 
+  const std::array<std::byte, 4> buf {
+    std::byte(0xFF),
     std::byte(0xFE),
     std::byte(0xFD),
     std::byte(0xFC)
@@ -85,8 +85,8 @@ TEST_CASE("known bytes 32 bits (high-bit bytes)") {
 }
 
 TEST_CASE("known bytes 48 bits (high-bit bytes)") {
-  const std::array<std::byte, 6> buf { 
-    std::byte(0xFF), 
+  const std::array<std::byte, 6> buf {
+    std::byte(0xFF),
     std::byte(0xFE),
     std::byte(0xFD),
     std::byte(0xFC),
@@ -100,8 +100,8 @@ TEST_CASE("known bytes 48 bits (high-bit bytes)") {
 }
 
 TEST_CASE("known bytes 64 bits (high-bit bytes)") {
-  const std::array<std::byte, 8> buf { 
-    std::byte(0xFF), 
+  const std::array<std::byte, 8> buf {
+    std::byte(0xFF),
     std::byte(0xFE),
     std::byte(0xFD),
     std::byte(0xFC),
@@ -120,28 +120,28 @@ TEST_CASE("read helpers return fixed-width unsigned types") {
 
   STATIC_REQUIRE(
       std::is_same_v<
-        decltype(itch::read_be16(std::declval<std::span<const std::byte, 2>>())), 
+        decltype(itch::read_be16(std::declval<std::span<const std::byte, 2>>())),
         uint16_t
       >
   );
 
   STATIC_REQUIRE(
       std::is_same_v<
-        decltype(itch::read_be32(std::declval<std::span<const std::byte, 4>>())), 
+        decltype(itch::read_be32(std::declval<std::span<const std::byte, 4>>())),
         uint32_t
       >
   );
 
   STATIC_REQUIRE(
       std::is_same_v<
-        decltype(itch::read_be48(std::declval<std::span<const std::byte, 6>>())), 
+        decltype(itch::read_be48(std::declval<std::span<const std::byte, 6>>())),
         uint64_t
       >
   );
 
   STATIC_REQUIRE(
       std::is_same_v<
-        decltype(itch::read_be64(std::declval<std::span<const std::byte, 8>>())), 
+        decltype(itch::read_be64(std::declval<std::span<const std::byte, 8>>())),
         uint64_t
       >
   );
