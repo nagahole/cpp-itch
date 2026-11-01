@@ -16,9 +16,12 @@ endif()
 add_library(pubsub INTERFACE)
 target_include_directories(pubsub INTERFACE include)
 
+add_library(itch INTERFACE)
+target_include_directories(itch INTERFACE include)
+
 add_executable(basic examples/basic.cpp)
 target_link_libraries(basic PRIVATE pubsub)
-target_compile_options(basic PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(basic PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 option(PUBSUB_BUILD_TESTS "Build tests" ON)
 if(PUBSUB_BUILD_TESTS)

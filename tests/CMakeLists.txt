@@ -7,9 +7,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(tests test_broker.cpp)
-target_link_libraries(tests PRIVATE pubsub Catch2::Catch2WithMain)
-target_compile_options(tests PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(tests
+  test_broker.cpp
+  test_endian.cpp
+)
+target_link_libraries(tests PRIVATE pubsub itch Catch2::Catch2WithMain)
+target_compile_options(tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(Catch)
