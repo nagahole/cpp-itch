@@ -25,7 +25,7 @@ Each stage should end with something that compiles, passes tests (including unde
 
 ### Stage 1: basic broker (done, frozen)
 - Topics by name, callbacks, synchronous delivery, templated message type, `Subscription` RAII handle, tests
-- Frozen: no further features. Only tag it (see "Current status").
+- Frozen and tagged `stage1-broker`. No further features.
 
 ### Stage 2: ITCH 5.0 parser
 - Get one day's sample file from Nasdaq (emi.nasdaq.com/ITCH, a few GB gzipped) and the ITCH 5.0 spec PDF. Keep data in `data/`, which is gitignored.
@@ -79,12 +79,21 @@ A short README covering what the system does, how it's built, how I checked corr
 - `include/pubsub/subscription.hpp`: move-only RAII handle holding a `std::function<void()>` cleanup that unsubscribes in the destructor. Move ops leave the source empty; move assignment runs the current cleanup first.
 - Broker lifetime guard: `Broker` owns a `shared_ptr<bool>` sentinel and each cleanup lambda holds a `weak_ptr` to it, so destroying a `Subscription` after its broker is a no-op
 - `tests/test_broker.cpp` covers: single delivery, multiple subscribers (handles stored in a `std::vector`), unknown topic, publish with no subscribers, topic isolation, message order for one subscriber, same callback subscribed twice is called twice, non-string message type (`int`), unsubscribe on destruction, subscription outliving its broker
-- Tests pass under the `asan` preset
+- Tests pass under the `asan` preset; tagged `stage1-broker`
+
+**Done (stage 2, in progress):**
+- `itch` header-only INTERFACE library (`include/itch/`), linked into `tests`
+- `-Wconversion` on `tests` and `basic`; the build is warning-free
+- `data/` gitignored; ITCH 5.0 spec PDF downloaded to `data/`. No ITCH day file yet (limited bandwidth until ~10 Nov).
+- `include/itch/endian.hpp`: `read_be16/32/48/64` taking fixed-extent `std::span<const std::byte, N>` (wrong size is a compile error). Shift-based, so independent of host byte order; return types are fixed-width unsigned. Tests in `tests/test_endian.cpp`: known values, high-bit bytes, unaligned offset via `subspan<off, n>()`, and `STATIC_REQUIRE` checks on return types.
+- `include/itch/mapped_file.hpp`: `MappedFile`, a move-only RAII wrapper over `open`/`fstat`/`mmap` (`PROT_READ`, `MAP_PRIVATE`). `explicit` constructor taking `const std::string&`; throws `std::system_error` (with `errno` saved right after the failing call) on failure. A local `FdGuard` closes the fd on every path, including throws; the fd is closed once mapping succeeds. Empty file maps nothing and gives an empty span. `bytes() const` returns `std::span<const std::byte>`; no read cursor (the parser owns its offset). Moves are `noexcept` and leave the source empty; `munmap` goes through a private `release()`.
+- `tests/test_mapped_file.cpp`: known bytes, nonexistent path throws `std::system_error`, empty file, move (moved-to has the bytes, moved-from is empty, survives `std::vector` reallocation). Uses a local `TempFile` fixture that writes and closes in its constructor and removes the file (non-throwing overload) in its destructor.
 
 **Next:**
-1. Tag stage 1 (`git tag stage1-broker`)
-2. Add `data/` to `.gitignore`; download one day's ITCH sample file and the ITCH 5.0 spec into `data/`
-3. Start stage 2: `mmap` RAII wrapper, then the length-prefixed message loop counting messages by type
+1. Framing loop: walk the 2-byte big-endian length-prefixed messages in a `std::span<const std::byte>` and count by type (`std::array<uint64_t, 256>` indexed by the type byte). Handle three end cases: exact end, fewer than 2 bytes left for the length, and a message cut off partway.
+2. Message structs and decoders for `S R A F E C X D U`, tested on hand-built byte buffers
+3. Stream a ~300 MB prefix of a day file (`curl … | gunzip | head -c 300M`) and run a smoke test counting messages by type. The last message will be truncated, which tests end case 3.
+4. Stage 2 target: done by mid-November. Get the full-day file over unlimited wifi before the end of November (needed for stage 3 numbers).
 
 **Placeholder files (empty):** `include/pubsub/spsc_queue.hpp` and `tests/test_spsc_queue.cpp` (stage 5), `benchmarks/bench_queues.cpp` and `benchmarks/CMakeLists.txt` (stages 3–5), `src/broker.cpp` (unused, since the broker is header-only; can be deleted). Suggested new layout: `include/itch/` (parser, message structs), `include/book/` (reference and optimised books), `tools/` (the full-day replay executable).
 
@@ -101,14 +110,18 @@ Broker (stage 1, kept for reference):
 
 Feed handler:
 - Prices stay as integers (ITCH prices are fixed-point `uint32` with 4 decimal places). Never convert to floating point inside the book.
-- ITCH is big-endian. `std::byteswap` is C++23, so on C++20 use shifts or a compiler builtin, wrapped in one small helper.
-- Read fields with `memcpy` (or `std::bit_cast` from a byte array), not by casting pointers into the buffer, which breaks alignment and strict aliasing
+- ITCH is big-endian. Fields are read with the shift-based helpers in `endian.hpp` (no `std::byteswap` until C++23).
+- Never read fields by casting pointers into the buffer, which breaks alignment and strict aliasing
+- `MappedFile` only owns the mapping. Everything downstream takes a `std::span<const std::byte>`, so the parser is tested on in-memory buffers with no files.
+- Truncation by external processes while mapped (`SIGBUS`) is not handled
 - Timestamps are 6-byte nanoseconds since midnight; store them as `uint64_t`
 - The reference book is the source of truth. Any optimisation that disagrees with it is a bug until proven otherwise.
 
 ## Conventions
 
-- C++20, `-Wall -Wextra -Wpedantic`
+- C++20, `-Wall -Wextra -Wpedantic -Wconversion`; keep the build warning-free
+- `noexcept` on move operations that can't throw
+- Never put a call with side effects inside `assert` (it disappears with `-DNDEBUG` in Release)
 - Private members use a trailing underscore (`subscribers_`)
 - Include what you use; no `<iostream>` in headers
 - Prefer explicit lambda captures (`[&received]`) over `[&]`, especially for callbacks that are stored or run on other threads
