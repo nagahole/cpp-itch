@@ -20,3 +20,7 @@ cmake --workflow --preset debug
 
 This configures, builds and runs the tests. Other presets: `release`, `asan`, `tsan`.
 
+## AI Use
+
+I use Claude as a tutor and code reviewer, not to write the implementation. It reviews my code, explains C++ idioms and flags issues. It only writes boilerplate (CMake, test scaffolding, benchmark harness) or code I explicitly ask for. The full instructions it works under are in [`CLAUDE.md`](CLAUDE.md).
+
