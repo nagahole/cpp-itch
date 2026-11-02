@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.preset }} (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [debug, asan]
+        compiler: [gcc, clang]
+        include:
+          - compiler: gcc
+            cxx: g++
+          - compiler: clang
+            cxx: clang++
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      # Newer runner kernels use more ASLR bits than some sanitizer runtimes expect
+      - name: Allow sanitizers to map memory
+        if: matrix.preset == 'asan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      - name: Build and test
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: cmake --workflow --preset ${{ matrix.preset }}
