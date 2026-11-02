@@ -1,5 +1,7 @@
 # cpp-itch
 
+[![CI](https://github.com/nagahole/cpp-itch/actions/workflows/ci.yml/badge.svg)](https://github.com/nagahole/cpp-itch/actions/workflows/ci.yml)
+
 A C++20 feed handler for Nasdaq TotalView-ITCH 5.0 market data, built as a project to learn modern C++. The goal is to parse a full trading day of ITCH data, rebuild the limit order book for every symbol, check it against a simple reference implementation, then profile and optimise it.
 
 ## Status
